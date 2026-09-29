@@ -6,6 +6,7 @@
 const bcrypt = require('bcryptjs');
 const db = require('./db');
 const { seedDefaultCategories } = require('./defaultCategories');
+const { ensureSavingsCategory } = require('./routes/goals');
 
 const EMAIL = 'demo@monbudget.fr';
 const PASSWORD = 'demo1234';
@@ -108,10 +109,28 @@ function run() {
     insertRule.run(user.id, cat('Salaire').id, 'income', 265000, 'Salaire mensuel', 'monthly', `${nextMonth}-01`, `${nextMonth}-01`);
     insertRule.run(user.id, cat('Abonnements').id, 'expense', 999, 'Netflix', 'monthly', `${nextMonth}-01`, `${nextMonth}-01`);
     insertRule.run(user.id, cat('Transport').id, 'expense', 4500, 'Pass transport', 'monthly', `${nextMonth}-01`, `${nextMonth}-01`);
+
+    // Objectifs d'épargne + versements associés (cohérents avec l'historique)
+    const savingsCat = ensureSavingsCategory(db, user.id, 'expense');
+    const insertGoal = db.prepare(
+      `INSERT INTO savings_goals (user_id, name, icon, color, target_amount, current_amount, deadline)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    );
+    insertGoal.run(user.id, "Vacances d'été", '🏖️', '#0ea5e9', 120000, 45000, null);
+    insertGoal.run(user.id, 'Vélo électrique', '🚲', '#f97316', 45000, 45000, null);
+    const deposits = [
+      ['Versement épargne — Vélo électrique', 5, 15000], ['Versement épargne — Vélo électrique', 4, 15000],
+      ['Versement épargne — Vélo électrique', 3, 15000], ["Versement épargne — Vacances d'été", 2, 15000],
+      ["Versement épargne — Vacances d'été", 1, 15000], ["Versement épargne — Vacances d'été", 0, 15000],
+    ];
+    for (const [label, m, amount] of deposits) {
+      insertTx.run(user.id, savingsCat.id, 'expense', amount, label, `${monthKey(m)}-05`);
+      txCount += 1;
+    }
   });
 
   seedAll();
-  console.log(`✅ Démo prête : ${txCount} transactions, ${budgetCount} budgets et 3 récurrences.`);
+  console.log(`✅ Démo prête : ${txCount} transactions, ${budgetCount} budgets, 3 récurrences, 2 objectifs.`);
   console.log(`   Identifiants : ${EMAIL} / ${PASSWORD}`);
 }
 

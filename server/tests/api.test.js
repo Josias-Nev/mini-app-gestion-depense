@@ -371,6 +371,81 @@ test('transactions récurrentes : création, génération, pause, suppression', 
   assert.equal(r.data.pagination.total, 4, 'transactions conservées après suppression de la règle');
 });
 
+// --------------------- OBJECTIFS D'ÉPARGNE ------------------------
+
+test('objectifs d\'épargne : CRUD, versement, retrait, retraits invalides', async () => {
+  // création
+  let r = await alice.post('/api/goals', { name: 'Vacances', target: 1000, icon: '🏖️', color: '#0ea5e9', deadline: '2027-06-01' });
+  assert.equal(r.status, 201);
+  const goalId = r.data.goal.id;
+  assert.equal(r.data.goal.target_amount, 100000);
+  assert.equal(r.data.goal.current_amount, 0);
+
+  // validation
+  r = await alice.post('/api/goals', { name: 'X', target: -50 });
+  assert.equal(r.status, 422);
+
+  // versement : crée une dépense « Épargne » et alimente l'objectif
+  r = await alice.post(`/api/goals/${goalId}/movements`, { amount: 100, action: 'deposit' });
+  assert.equal(r.status, 201);
+  assert.equal(r.data.goal.current_amount, 10000);
+  assert.equal(r.data.transaction.type, 'expense');
+  assert.equal(r.data.transaction.amount, 10000);
+
+  // la catégorie Épargne a été créée à la volée
+  const cats = (await alice.get('/api/categories')).data.categories;
+  assert.ok(cats.some((c) => c.name === 'Épargne' && c.type === 'expense'));
+
+  // la transaction apparaît dans l'historique
+  r = await alice.get('/api/transactions?q=Versement+épargne');
+  assert.equal(r.data.pagination.total, 1);
+
+  // modification
+  r = await alice.patch(`/api/goals/${goalId}`, { target: 1200, name: 'Vacances été' });
+  assert.equal(r.status, 200);
+  assert.equal(r.data.goal.target_amount, 120000);
+
+  // retrait supérieur au solde de l'objectif → refusé
+  r = await alice.post(`/api/goals/${goalId}/movements`, { amount: 500, action: 'withdraw' });
+  assert.equal(r.status, 400);
+
+  // retrait valide : crée un revenu « Retrait épargne »
+  r = await alice.post(`/api/goals/${goalId}/movements`, { amount: 40, action: 'withdraw' });
+  assert.equal(r.status, 201);
+  assert.equal(r.data.goal.current_amount, 6000);
+  assert.equal(r.data.transaction.type, 'income');
+
+  // Bob ne peut pas toucher l'objectif d'Alice
+  r = await bob.post(`/api/goals/${goalId}/movements`, { amount: 10, action: 'deposit' });
+  assert.equal(r.status, 404);
+
+  // suppression (les transactions générées sont conservées)
+  r = await alice.del(`/api/goals/${goalId}`);
+  assert.equal(r.status, 200);
+  r = await alice.get('/api/transactions?q=épargne');
+  assert.equal(r.data.pagination.total, 2, 'versement + retrait conservés');
+});
+
+// ------------------------ RAPPORT MENSUEL --------------------------
+
+test('stats/monthly-report : totaux, mois précédent, catégories, top dépenses', async () => {
+  let r = await alice.get('/api/stats/monthly-report?month=2026-08');
+  assert.equal(r.status, 200);
+  // août : sandwich (12,90) + Netflix du 01/08 (9,99) = 22,89 € de dépenses, 0 revenu
+  assert.equal(r.data.totals.expense, 1290 + 999);
+  assert.equal(r.data.totals.income, 0);
+  assert.equal(r.data.prev.expense, 999, 'juillet : seulement Netflix du 01/07');
+  assert.equal(r.data.topExpenses[0].description, 'Sandwich');
+  assert.ok(r.data.expenses.some((c) => c.name === 'Alimentation' && c.total === 1290));
+  assert.ok(r.data.expenses.some((c) => c.name === 'Abonnements' && c.total === 999));
+  // À fin août : aucun revenu encore (salaire le 01/09), dépenses = sandwich + 3 Netflix (06→08)
+  assert.equal(r.data.balanceAtEnd, -(1290 + 999 * 3), 'solde cumulé fin août');
+
+  // mois invalide
+  r = await alice.get('/api/stats/monthly-report?month=2026-13');
+  assert.equal(r.status, 400);
+});
+
 // ---------------------------- PROFIL ------------------------------
 
 test('profil : mise à jour infos + mot de passe', async () => {

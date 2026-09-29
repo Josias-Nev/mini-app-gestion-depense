@@ -1,0 +1,14 @@
+services:
+  app:
+    build: .
+    ports:
+      - "4000:4000"
+    environment:
+      # À remplacer impérativement en production
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+    volumes:
+      - monbudget-data:/data
+    restart: unless-stopped
+
+volumes:
+  monbudget-data:

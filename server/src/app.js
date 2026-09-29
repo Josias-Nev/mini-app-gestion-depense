@@ -13,6 +13,7 @@ const transactionRoutes = require('./routes/transactions');
 const budgetRoutes = require('./routes/budgets');
 const statsRoutes = require('./routes/stats');
 const recurringRoutes = require('./routes/recurring');
+const goalRoutes = require('./routes/goals');
 
 function createApp() {
   const app = express();
@@ -28,6 +29,7 @@ function createApp() {
   app.use('/api/budgets', requireAuth, budgetRoutes);
   app.use('/api/stats', requireAuth, statsRoutes);
   app.use('/api/recurring', requireAuth, recurringRoutes);
+  app.use('/api/goals', requireAuth, goalRoutes);
 
   app.get('/api/health', (req, res) => res.json({ ok: true }));
   app.use('/api', notFound);

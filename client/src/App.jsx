@@ -10,7 +10,9 @@ import Transactions from './pages/Transactions';
 import Recurring from './pages/Recurring';
 import Categories from './pages/Categories';
 import Budgets from './pages/Budgets';
+import Goals from './pages/Goals';
 import Stats from './pages/Stats';
+import Report from './pages/Report';
 import Profile from './pages/Profile';
 
 function FullScreenLoader() {
@@ -69,7 +71,9 @@ export default function App() {
               <Route path="/recurring" element={<Recurring />} />
               <Route path="/categories" element={<Categories />} />
               <Route path="/budgets" element={<Budgets />} />
+              <Route path="/goals" element={<Goals />} />
               <Route path="/stats" element={<Stats />} />
+              <Route path="/report" element={<Report />} />
               <Route path="/profile" element={<Profile />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />

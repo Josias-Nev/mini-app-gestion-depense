@@ -19,7 +19,7 @@ import { useCategories } from '../hooks/useCategories';
 import { useToast } from '../context/ToastContext';
 import { Spinner, EmptyState, ErrorBox } from '../components/Feedback';
 import TransactionForm from '../components/TransactionForm';
-import { IconPlus, IconArrowUp, IconArrowDown, IconWallet } from '../components/Icons';
+import { IconPlus, IconArrowUp, IconArrowDown, IconWallet, IconPrinter } from '../components/Icons';
 import { formatMoney, formatDate, shortMonthLabel, monthLabel } from '../utils/format';
 
 function StatCard({ title, value, subtitle, icon, tone }) {
@@ -146,6 +146,9 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Link to="/report" className="btn-secondary" title="Rapport mensuel imprimable">
+            <IconPrinter /> <span className="hidden sm:inline">Rapport</span>
+          </Link>
           <button className="btn-secondary" onClick={() => openForm('income')}>
             <IconArrowUp size={16} className="text-accent" /> Revenu
           </button>

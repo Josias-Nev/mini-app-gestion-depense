@@ -89,3 +89,37 @@
 [data-theme='dark'] .card {
   box-shadow: none;
 }
+
+/* ---- Impression (rapport mensuel) : palette claire forcée ---- */
+@media print {
+  :root,
+  [data-theme='dark'] {
+    color-scheme: light;
+    --c-bg: 255 255 255;
+    --c-surface: 255 255 255;
+    --c-raised: 245 247 250;
+    --c-raised2: 235 238 243;
+    --c-strong: 15 23 42;
+    --c-mute: 70 80 100;
+    --c-faint: 120 128 140;
+    --c-line: 15 23 42;
+    --c-accent: 4 120 87;
+    --c-danger: 190 18 60;
+    --c-warning: 180 83 9;
+    --c-info: 29 78 216;
+  }
+  body {
+    background: #fff !important;
+    background-image: none !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .card {
+    box-shadow: none !important;
+  }
+}
+
+@page {
+  margin: 14mm;
+}

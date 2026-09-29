@@ -72,11 +72,25 @@ CREATE TABLE IF NOT EXISTS recurring_rules (
   updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS savings_goals (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name           TEXT NOT NULL,
+  icon           TEXT NOT NULL DEFAULT '🎯',
+  color          TEXT NOT NULL DEFAULT '#3b82f6',
+  target_amount  INTEGER NOT NULL CHECK (target_amount > 0), -- en centimes
+  current_amount INTEGER NOT NULL DEFAULT 0 CHECK (current_amount >= 0),
+  deadline       TEXT, -- format YYYY-MM-DD, optionnel
+  created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at     TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_transactions_user_date ON transactions(user_id, date DESC);
 CREATE INDEX IF NOT EXISTS idx_transactions_user_cat  ON transactions(user_id, category_id);
 CREATE INDEX IF NOT EXISTS idx_categories_user        ON categories(user_id);
 CREATE INDEX IF NOT EXISTS idx_budgets_user_month     ON budgets(user_id, month);
 CREATE INDEX IF NOT EXISTS idx_recurring_active       ON recurring_rules(active, next_run_date);
+CREATE INDEX IF NOT EXISTS idx_goals_user             ON savings_goals(user_id);
 `);
 
 module.exports = db;

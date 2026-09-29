@@ -198,6 +198,28 @@ export const IconPlay = (p) => (
   </I>
 );
 
+export const IconTarget = (p) => (
+  <I {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <circle cx="12" cy="12" r="5" />
+    <circle cx="12" cy="12" r="1.2" fill="currentColor" />
+  </I>
+);
+
+export const IconPrinter = (p) => (
+  <I {...p} size={16}>
+    <polyline points="6 9 6 2 18 2 18 9" />
+    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+    <rect x="6" y="14" width="12" height="8" />
+  </I>
+);
+
+export const IconMinus = (p) => (
+  <I {...p} size={16}>
+    <line x1="5" y1="12" x2="19" y2="12" />
+  </I>
+);
+
 export function Logo({ size = 34 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden="true">

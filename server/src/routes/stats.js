@@ -180,6 +180,80 @@ router.get('/by-period', (req, res) => {
   res.json({ from, to, granularity, points: [...buckets.values()] });
 });
 
+// GET /api/stats/monthly-report?month=YYYY-MM — toutes les données du rapport imprimable
+router.get('/monthly-report', (req, res) => {
+  const month = req.query.month;
+  if (!month || !MONTH_RE.test(month)) {
+    return res.status(400).json({ error: { message: 'Paramètre "month" requis (format AAAA-MM).' } });
+  }
+  const from = `${month}-01`;
+  const to = `${month}-31`;
+
+  const totals = db
+    .prepare(
+      `SELECT
+         COALESCE(SUM(CASE WHEN type = 'income' THEN amount END), 0)  AS income,
+         COALESCE(SUM(CASE WHEN type = 'expense' THEN amount END), 0) AS expense,
+         COUNT(*) AS count
+       FROM transactions WHERE user_id = ? AND date BETWEEN ? AND ?`
+    )
+    .get(req.userId, from, to);
+
+  const prev = db
+    .prepare(
+      `SELECT
+         COALESCE(SUM(CASE WHEN type = 'income' THEN amount END), 0)  AS income,
+         COALESCE(SUM(CASE WHEN type = 'expense' THEN amount END), 0) AS expense
+       FROM transactions
+       WHERE user_id = ? AND date BETWEEN date(?, '-1 month', 'start of month')
+                                     AND date(?, 'start of month', '-1 day')`
+    )
+    .get(req.userId, from, from);
+
+  const byCategory = db
+    .prepare(
+      `SELECT c.name, c.color, c.icon, t.type,
+              SUM(t.amount) AS total, COUNT(t.id) AS count
+       FROM transactions t
+       JOIN categories c ON c.id = t.category_id
+       WHERE t.user_id = ? AND t.date BETWEEN ? AND ?
+       GROUP BY c.id, t.type
+       ORDER BY total DESC`
+    )
+    .all(req.userId, from, to);
+
+  const topExpenses = db
+    .prepare(
+      `SELECT t.amount, t.description, t.date, c.name AS categoryName, c.icon AS categoryIcon
+       FROM transactions t
+       LEFT JOIN categories c ON c.id = t.category_id
+       WHERE t.user_id = ? AND t.type = 'expense' AND t.date BETWEEN ? AND ?
+       ORDER BY t.amount DESC
+       LIMIT 5`
+    )
+    .all(req.userId, from, to);
+
+  // balance cumulé à la fin du mois (toutes transactions jusqu'à "to")
+  const balanceAtEnd = db
+    .prepare(
+      `SELECT
+         COALESCE(SUM(CASE WHEN type = 'income' THEN amount END), 0) -
+         COALESCE(SUM(CASE WHEN type = 'expense' THEN amount END), 0) AS balance
+       FROM transactions WHERE user_id = ? AND date <= ?`
+    )
+    .get(req.userId, to).balance;
+
+  res.json({
+    month,
+    totals,
+    balanceAtEnd,
+    prev,
+    expenses: byCategory.filter((r) => r.type === 'expense'),
+    incomes: byCategory.filter((r) => r.type === 'income'),
+    topExpenses,
+  });
+});
+
 // GET /api/stats/daily?month=YYYY-MM — dépenses cumulées jour par jour
 router.get('/daily', (req, res) => {
   const month = req.query.month;
