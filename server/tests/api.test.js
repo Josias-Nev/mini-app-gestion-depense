@@ -1,0 +1,476 @@
+const { test, before, after } = require('node:test');
+const assert = require('node:assert');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+
+// Base SQLite temporaire, avant tout chargement de l'app
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gd-test-'));
+process.env.DB_PATH = path.join(tmpDir, 'test.db');
+process.env.JWT_SECRET = 'test-secret';
+
+const { createApp } = require('../src/app');
+
+let server;
+let baseUrl;
+
+function client() {
+  let token = null;
+  return {
+    setToken(t) { token = t; },
+    token() { return token; },
+    async req(method, url, body) {
+      const res = await fetch(baseUrl + url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      let data = null;
+      try { data = await res.json(); } catch { /* réponse vide */ }
+      return { status: res.status, data };
+    },
+    get(u) { return this.req('GET', u); },
+    post(u, b) { return this.req('POST', u, b); },
+    put(u, b) { return this.req('PUT', u, b); },
+    patch(u, b) { return this.req('PATCH', u, b); },
+    del(u) { return this.req('DELETE', u); },
+  };
+}
+
+const alice = client();
+const bob = client();
+
+before(async () => {
+  const app = createApp();
+  await new Promise((resolve) => {
+    server = app.listen(0, '127.0.0.1', resolve);
+  });
+  baseUrl = `http://127.0.0.1:${server.address().port}`;
+});
+
+after(() => {
+  server?.close();
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+});
+
+// ------------------------------ AUTH ------------------------------
+
+test('health check', async () => {
+  const r = await alice.get('/api/health');
+  assert.equal(r.status, 200);
+  assert.equal(r.data.ok, true);
+});
+
+test('inscription : validation des champs', async () => {
+  let r = await alice.post('/api/auth/register', { name: 'A', email: 'bad', password: '123' });
+  assert.equal(r.status, 422);
+  r = await alice.post('/api/auth/register', { name: 'Alice', email: 'alice@test.fr', password: 'motdepasse1' });
+  assert.equal(r.status, 201);
+  assert.equal(r.data.user.email, 'alice@test.fr');
+  assert.ok(r.data.token);
+  alice.setToken(r.data.token);
+});
+
+test('inscription : email dupliqué refusé', async () => {
+  const r = await alice.post('/api/auth/register', { name: 'Alice 2', email: 'alice@test.fr', password: 'motdepasse1' });
+  assert.equal(r.status, 409);
+});
+
+test('connexion : mauvais mot de passe refusé, bon accepté', async () => {
+  let r = await alice.post('/api/auth/login', { email: 'alice@test.fr', password: 'faux' });
+  assert.equal(r.status, 401);
+  r = await alice.post('/api/auth/login', { email: 'alice@test.fr', password: 'motdepasse1' });
+  assert.equal(r.status, 200);
+  r = await bob.post('/api/auth/register', { name: 'Bob', email: 'bob@test.fr', password: 'motdepasse2' });
+  assert.equal(r.status, 201);
+  bob.setToken(r.data.token);
+});
+
+test('route protégée sans token → 401', async () => {
+  const anon = client();
+  const r = await anon.get('/api/transactions');
+  assert.equal(r.status, 401);
+});
+
+test('GET /api/auth/me', async () => {
+  const r = await alice.get('/api/auth/me');
+  assert.equal(r.status, 200);
+  assert.equal(r.data.user.name, 'Alice');
+});
+
+// --------------------------- CATÉGORIES ---------------------------
+
+test('catégories par défaut créées à l’inscription', async () => {
+  const r = await alice.get('/api/categories');
+  assert.equal(r.status, 200);
+  assert.ok(r.data.categories.length >= 10);
+  assert.ok(r.data.categories.some((c) => c.name === 'Alimentation' && c.type === 'expense'));
+  assert.ok(r.data.categories.some((c) => c.name === 'Salaire' && c.type === 'income'));
+});
+
+let customCatId;
+test('CRUD catégories', async () => {
+  let r = await alice.post('/api/categories', { name: 'Sport', type: 'expense', color: '#ff0000', icon: '⚽' });
+  assert.equal(r.status, 201);
+  customCatId = r.data.category.id;
+
+  // doublon refusé
+  r = await alice.post('/api/categories', { name: 'Sport', type: 'expense', color: '#ff0000', icon: '⚽' });
+  assert.equal(r.status, 409);
+
+  // modification
+  r = await alice.patch(`/api/categories/${customCatId}`, { name: 'Sport & Fitness', type: 'expense', color: '#00ff00', icon: '🏋️' });
+  assert.equal(r.status, 200);
+  assert.equal(r.data.category.name, 'Sport & Fitness');
+
+  // couleur invalide
+  r = await alice.patch(`/api/categories/${customCatId}`, { name: 'X', type: 'expense', color: 'rouge', icon: '🏋️' });
+  assert.equal(r.status, 422);
+
+  // Bob ne peut pas toucher à la catégorie d'Alice
+  r = await bob.del(`/api/categories/${customCatId}`);
+  assert.equal(r.status, 404);
+});
+
+// -------------------------- TRANSACTIONS --------------------------
+
+let txId;
+let foodCatId;
+let salaryCatId;
+
+test('création de transactions + validations', async () => {
+  const cats = (await alice.get('/api/categories')).data.categories;
+  foodCatId = cats.find((c) => c.name === 'Alimentation').id;
+  salaryCatId = cats.find((c) => c.name === 'Salaire').id;
+
+  // montant négatif refusé
+  let r = await alice.post('/api/transactions', { type: 'expense', amount: -5, categoryId: foodCatId, date: '2026-09-01' });
+  assert.equal(r.status, 422);
+
+  // mauvaise combinaison type/catégorie refusée
+  r = await alice.post('/api/transactions', { type: 'expense', amount: 5, categoryId: salaryCatId, date: '2026-09-01' });
+  assert.equal(r.status, 400);
+
+  // date invalide refusée
+  r = await alice.post('/api/transactions', { type: 'expense', amount: 5, categoryId: foodCatId, date: '01/09/2026' });
+  assert.equal(r.status, 422);
+
+  // créations valides
+  r = await alice.post('/api/transactions', { type: 'expense', amount: 42.5, categoryId: foodCatId, date: '2026-09-10', description: 'Courses Carrefour' });
+  assert.equal(r.status, 201);
+  assert.equal(r.data.transaction.amount, 4250); // stocké en centimes
+  txId = r.data.transaction.id;
+
+  await alice.post('/api/transactions', { type: 'income', amount: 2500, categoryId: salaryCatId, date: '2026-09-01', description: 'Salaire septembre' });
+  await alice.post('/api/transactions', { type: 'expense', amount: 12.9, categoryId: foodCatId, date: '2026-08-15', description: 'Sandwich' });
+});
+
+test('liste, filtres, recherche et pagination', async () => {
+  let r = await alice.get('/api/transactions?type=expense');
+  assert.equal(r.status, 200);
+  assert.equal(r.data.pagination.total, 2);
+
+  r = await alice.get('/api/transactions?q=carrefour');
+  assert.equal(r.data.pagination.total, 1);
+
+  r = await alice.get('/api/transactions?from=2026-09-01&to=2026-09-30');
+  assert.equal(r.data.pagination.total, 2);
+
+  r = await alice.get('/api/transactions?categoryId=' + foodCatId);
+  assert.equal(r.data.pagination.total, 2);
+
+  r = await alice.get('/api/transactions?limit=1&page=2&sort=date_desc');
+  assert.equal(r.data.transactions.length, 1);
+  assert.equal(r.data.pagination.totalPages, 3);
+
+  // totaux filtrés cohérents
+  r = await alice.get('/api/transactions?month=&type=income');
+  assert.equal(r.data.totals.income, 250000);
+});
+
+test('modification et suppression de transaction', async () => {
+  let r = await alice.patch(`/api/transactions/${txId}`, {
+    type: 'expense', amount: 50, categoryId: foodCatId, date: '2026-09-11', description: 'Courses modifiées',
+  });
+  assert.equal(r.status, 200);
+  assert.equal(r.data.transaction.amount, 5000);
+
+  // Bob ne peut pas supprimer la transaction d'Alice
+  r = await bob.del(`/api/transactions/${txId}`);
+  assert.equal(r.status, 404);
+
+  r = await alice.del(`/api/transactions/${txId}`);
+  assert.equal(r.status, 200);
+  r = await alice.get(`/api/transactions/${txId}`);
+  assert.equal(r.status, 404);
+});
+
+// ----------------------------- BUDGETS ----------------------------
+
+let budgetId;
+test('budgets : création (upsert), lecture avec dépenses, suppression', async () => {
+  // une dépense de septembre dans la catégorie pour vérifier le calcul "spent"
+  let r = await alice.post('/api/transactions', { type: 'expense', amount: 30, categoryId: foodCatId, date: '2026-09-20', description: 'Marché' });
+  assert.equal(r.status, 201);
+
+  r = await alice.put('/api/budgets', { categoryId: foodCatId, month: '2026-09', amount: 300 });
+  assert.equal(r.status, 201);
+  budgetId = r.data.budget.id;
+
+  // upsert : même mois + catégorie → mise à jour, pas de doublon
+  r = await alice.put('/api/budgets', { categoryId: foodCatId, month: '2026-09', amount: 250 });
+  assert.equal(r.status, 201);
+
+  r = await alice.get('/api/budgets?month=2026-09');
+  assert.equal(r.status, 200);
+  assert.equal(r.data.budgets.length, 1);
+  assert.equal(r.data.budgets[0].amount, 25000);
+  assert.equal(r.data.budgets[0].spent, 3000); // le sandwich d'août n'est pas compté
+
+  // budget sur catégorie de revenu refusé
+  r = await alice.put('/api/budgets', { categoryId: salaryCatId, month: '2026-09', amount: 100 });
+  assert.equal(r.status, 404);
+
+  // mois invalide
+  r = await alice.get('/api/budgets?month=2026-13');
+  assert.equal(r.status, 400);
+
+  r = await alice.del(`/api/budgets/${budgetId}`);
+  assert.equal(r.status, 200);
+});
+
+// ------------------------------ STATS -----------------------------
+
+test('statistiques : overview, by-category, monthly, daily', async () => {
+  let r = await alice.get('/api/stats/overview');
+  assert.equal(r.status, 200);
+  assert.equal(r.data.global.income, 250000);
+  assert.equal(r.data.global.expense, 1290 + 3000);
+  assert.equal(r.data.balance, 250000 - 4290);
+
+  r = await alice.get('/api/stats/by-category?type=expense');
+  assert.equal(r.status, 200);
+  assert.equal(r.data.categories[0].name, 'Alimentation');
+  assert.equal(r.data.categories[0].total, 4290);
+
+  r = await alice.get('/api/stats/monthly?months=6');
+  assert.equal(r.status, 200);
+  assert.equal(r.data.months.length, 2); // août + septembre
+
+  r = await alice.get('/api/stats/daily?month=2026-08');
+  assert.equal(r.status, 200);
+  assert.equal(r.data.days.length, 1);
+  assert.equal(r.data.days[0].total, 1290);
+});
+
+// ---------------------------- EXPORT CSV ---------------------------
+
+test('export CSV : en-têtes, contenu et filtres', async () => {
+  let res = await fetch(`${baseUrl}/api/transactions/export.csv`, {
+    headers: { Authorization: `Bearer ${alice.token()}` },
+  });
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get('content-type'), /text\/csv/);
+  assert.match(res.headers.get('content-disposition'), /attachment/);
+  // Le BOM UTF-8 est présent dans les octets bruts (le décodage text() de fetch le masque)
+  const raw = Buffer.from(await res.arrayBuffer());
+  assert.deepEqual([...raw.subarray(0, 3)], [0xef, 0xbb, 0xbf], 'BOM UTF-8 présent');
+  const lines = raw.toString('utf8').slice(1).trim().split('\r\n');
+  assert.equal(lines[0], 'Date;Type;Catégorie;Description;Montant');
+  // 3 transactions à ce stade : salaire, sandwich, marché
+  assert.equal(lines.length, 4);
+  assert.ok(lines.some((l) => l.includes('Salaire septembre') && l.includes('2500,00')));
+  assert.ok(lines.some((l) => l.includes('-12,90')), 'dépense signée négativement');
+
+  // filtre appliqué à l'export
+  res = await fetch(`${baseUrl}/api/transactions/export.csv?type=income`, {
+    headers: { Authorization: `Bearer ${alice.token()}` },
+  });
+  const filtered = (await res.text()).trim().split('\r\n');
+  assert.equal(filtered.length, 2); // header + 1 revenu
+});
+
+// -------------------- STATS PAR SOUS-PÉRIODE -----------------------
+
+test('stats/by-period : jour, semaine, mois + validations', async () => {
+  // vue jour : plage de 11 jours, seul le 15/08 a une dépense (12,90 €)
+  let r = await alice.get('/api/stats/by-period?from=2026-08-10&to=2026-08-20&granularity=day');
+  assert.equal(r.status, 200);
+  assert.equal(r.data.points.length, 11);
+  const day15 = r.data.points.find((p) => p.period === '2026-08-15');
+  assert.equal(day15.expense, 1290);
+  assert.equal(r.data.points.filter((p) => p.expense > 0).length, 1);
+
+  // vue semaine : le lundi de la semaine du 15/08 est le 10/08
+  r = await alice.get('/api/stats/by-period?from=2026-08-10&to=2026-08-20&granularity=week');
+  assert.equal(r.status, 200);
+  assert.equal(r.data.points.length, 2);
+  assert.equal(r.data.points[0].period, '2026-08-10');
+  assert.equal(r.data.points[0].expense, 1290);
+
+  // vue mois : 12 sous-périodes, août et septembre alimentés
+  r = await alice.get('/api/stats/by-period?from=2026-01-01&to=2026-12-31&granularity=month');
+  assert.equal(r.status, 200);
+  assert.equal(r.data.points.length, 12);
+  assert.equal(r.data.points.find((p) => p.period === '2026-09-01').income, 250000);
+
+  // validations
+  r = await alice.get('/api/stats/by-period?from=2026-09-01&to=2026-01-01&granularity=month');
+  assert.equal(r.status, 400); // from > to
+  r = await alice.get('/api/stats/by-period?from=2026-01-01&to=2026-04-30&granularity=day');
+  assert.equal(r.status, 400); // trop de jours pour la vue jour
+  r = await alice.get('/api/stats/by-period?from=2024-01-01&to=2026-12-31&granularity=month');
+  assert.equal(r.status, 400); // plage > 366 jours
+  r = await alice.get('/api/stats/by-period?from=2026-01-01&to=2026-02-01&granularity=hour');
+  assert.equal(r.status, 400); // granularité inconnue
+});
+
+// ----------------------- TRANSACTIONS RÉCURRENTES ------------------
+
+test('transactions récurrentes : création, génération, pause, suppression', async () => {
+  const cats = (await alice.get('/api/categories')).data.categories;
+  const subsCatId = cats.find((c) => c.name === 'Abonnements').id;
+
+  // Règle mensuelle depuis juin → échéances de juin à septembre générées d'un coup
+  let r = await alice.post('/api/recurring', {
+    type: 'expense', amount: 9.99, categoryId: subsCatId,
+    frequency: 'monthly', start_date: '2026-06-01', description: 'Netflix',
+  });
+  assert.equal(r.status, 201);
+  const ruleId = r.data.rule.id;
+  assert.equal(r.data.rule.nextRunDate > '2026-09-01', true, 'échéance avancée au mois suivant');
+
+  // les 4 occurrences (juin, juillet, août, septembre) existent
+  r = await alice.get(`/api/transactions?categoryId=${subsCatId}&limit=20`);
+  assert.equal(r.data.pagination.total, 4);
+  assert.ok(r.data.transactions.every((t) => t.amount === 999));
+
+  // validations
+  r = await alice.post('/api/recurring', {
+    type: 'expense', amount: 5, categoryId: subsCatId,
+    frequency: 'whenever', start_date: '2026-09-01',
+  });
+  assert.equal(r.status, 422);
+
+  // pause : la règle passe en inactif
+  r = await alice.patch(`/api/recurring/${ruleId}`, { active: false });
+  assert.equal(r.status, 200);
+  assert.equal(r.data.rule.active, 0);
+
+  // Bob ne peut pas modifier la règle d'Alice
+  r = await bob.patch(`/api/recurring/${ruleId}`, { active: true });
+  assert.equal(r.status, 404);
+
+  // suppression (les transactions générées sont conservées)
+  r = await alice.del(`/api/recurring/${ruleId}`);
+  assert.equal(r.status, 200);
+  r = await alice.get(`/api/transactions?categoryId=${subsCatId}&limit=1`);
+  assert.equal(r.data.pagination.total, 4, 'transactions conservées après suppression de la règle');
+});
+
+// --------------------- OBJECTIFS D'ÉPARGNE ------------------------
+
+test('objectifs d\'épargne : CRUD, versement, retrait, retraits invalides', async () => {
+  // création
+  let r = await alice.post('/api/goals', { name: 'Vacances', target: 1000, icon: '🏖️', color: '#0ea5e9', deadline: '2027-06-01' });
+  assert.equal(r.status, 201);
+  const goalId = r.data.goal.id;
+  assert.equal(r.data.goal.target_amount, 100000);
+  assert.equal(r.data.goal.current_amount, 0);
+
+  // validation
+  r = await alice.post('/api/goals', { name: 'X', target: -50 });
+  assert.equal(r.status, 422);
+
+  // versement : crée une dépense « Épargne » et alimente l'objectif
+  r = await alice.post(`/api/goals/${goalId}/movements`, { amount: 100, action: 'deposit' });
+  assert.equal(r.status, 201);
+  assert.equal(r.data.goal.current_amount, 10000);
+  assert.equal(r.data.transaction.type, 'expense');
+  assert.equal(r.data.transaction.amount, 10000);
+
+  // la catégorie Épargne a été créée à la volée
+  const cats = (await alice.get('/api/categories')).data.categories;
+  assert.ok(cats.some((c) => c.name === 'Épargne' && c.type === 'expense'));
+
+  // la transaction apparaît dans l'historique
+  r = await alice.get('/api/transactions?q=Versement+épargne');
+  assert.equal(r.data.pagination.total, 1);
+
+  // modification
+  r = await alice.patch(`/api/goals/${goalId}`, { target: 1200, name: 'Vacances été' });
+  assert.equal(r.status, 200);
+  assert.equal(r.data.goal.target_amount, 120000);
+
+  // retrait supérieur au solde de l'objectif → refusé
+  r = await alice.post(`/api/goals/${goalId}/movements`, { amount: 500, action: 'withdraw' });
+  assert.equal(r.status, 400);
+
+  // retrait valide : crée un revenu « Retrait épargne »
+  r = await alice.post(`/api/goals/${goalId}/movements`, { amount: 40, action: 'withdraw' });
+  assert.equal(r.status, 201);
+  assert.equal(r.data.goal.current_amount, 6000);
+  assert.equal(r.data.transaction.type, 'income');
+
+  // Bob ne peut pas toucher l'objectif d'Alice
+  r = await bob.post(`/api/goals/${goalId}/movements`, { amount: 10, action: 'deposit' });
+  assert.equal(r.status, 404);
+
+  // suppression (les transactions générées sont conservées)
+  r = await alice.del(`/api/goals/${goalId}`);
+  assert.equal(r.status, 200);
+  r = await alice.get('/api/transactions?q=épargne');
+  assert.equal(r.data.pagination.total, 2, 'versement + retrait conservés');
+});
+
+// ------------------------ RAPPORT MENSUEL --------------------------
+
+test('stats/monthly-report : totaux, mois précédent, catégories, top dépenses', async () => {
+  let r = await alice.get('/api/stats/monthly-report?month=2026-08');
+  assert.equal(r.status, 200);
+  // août : sandwich (12,90) + Netflix du 01/08 (9,99) = 22,89 € de dépenses, 0 revenu
+  assert.equal(r.data.totals.expense, 1290 + 999);
+  assert.equal(r.data.totals.income, 0);
+  assert.equal(r.data.prev.expense, 999, 'juillet : seulement Netflix du 01/07');
+  assert.equal(r.data.topExpenses[0].description, 'Sandwich');
+  assert.ok(r.data.expenses.some((c) => c.name === 'Alimentation' && c.total === 1290));
+  assert.ok(r.data.expenses.some((c) => c.name === 'Abonnements' && c.total === 999));
+  // À fin août : aucun revenu encore (salaire le 01/09), dépenses = sandwich + 3 Netflix (06→08)
+  assert.equal(r.data.balanceAtEnd, -(1290 + 999 * 3), 'solde cumulé fin août');
+
+  // mois invalide
+  r = await alice.get('/api/stats/monthly-report?month=2026-13');
+  assert.equal(r.status, 400);
+});
+
+// ---------------------------- PROFIL ------------------------------
+
+test('profil : mise à jour infos + mot de passe', async () => {
+  let r = await alice.patch('/api/users/me', { name: 'Alice Martin', email: 'alice@test.fr', currency: 'XOF' });
+  assert.equal(r.status, 200);
+  assert.equal(r.data.user.currency, 'XOF');
+
+  // email déjà pris par Bob
+  r = await alice.patch('/api/users/me', { name: 'Alice Martin', email: 'bob@test.fr', currency: 'EUR' });
+  assert.equal(r.status, 409);
+
+  // mauvais mot de passe actuel
+  r = await alice.patch('/api/users/me/password', { currentPassword: 'faux', newPassword: 'nouveaumdp1' });
+  assert.equal(r.status, 400);
+
+  r = await alice.patch('/api/users/me/password', { currentPassword: 'motdepasse1', newPassword: 'nouveaumdp1' });
+  assert.equal(r.status, 200);
+
+  // reconnexion avec le nouveau mot de passe
+  r = await alice.post('/api/auth/login', { email: 'alice@test.fr', password: 'nouveaumdp1' });
+  assert.equal(r.status, 200);
+});
+
+test('isolation des données entre utilisateurs', async () => {
+  const r = await bob.get('/api/stats/overview');
+  assert.equal(r.status, 200);
+  assert.equal(r.data.global.count, 0); // Bob n'a aucune transaction
+});

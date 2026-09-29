@@ -1,0 +1,125 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---- Tokens de thème (canaux RGB consommés par tailwind.config.js) ---- */
+:root {
+  color-scheme: light;
+  --c-bg: 248 250 252; /* slate-50 */
+  --c-surface: 255 255 255;
+  --c-raised: 241 245 249; /* slate-100 */
+  --c-raised2: 226 232 240; /* slate-200 */
+  --c-strong: 15 23 42; /* slate-900 */
+  --c-mute: 71 85 105; /* slate-600 */
+  --c-faint: 100 116 139; /* slate-500 */
+  --c-line: 15 23 42;
+  --c-accent: 4 120 87; /* brand-700 */
+  --c-danger: 190 18 60; /* rose-700 */
+  --c-warning: 180 83 9; /* amber-700 */
+  --c-info: 29 78 216; /* blue-700 */
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+  --c-bg: 2 6 23; /* slate-950 */
+  --c-surface: 15 23 42; /* slate-900 */
+  --c-raised: 30 41 59; /* slate-800 */
+  --c-raised2: 51 65 85; /* slate-700 */
+  --c-strong: 241 245 249; /* slate-100 */
+  --c-mute: 148 163 184; /* slate-400 */
+  --c-faint: 100 116 139; /* slate-500 */
+  --c-line: 255 255 255;
+  --c-accent: 110 231 183; /* brand-300 */
+  --c-danger: 253 164 175; /* rose-300 */
+  --c-warning: 252 211 77; /* amber-300 */
+  --c-info: 147 197 253; /* blue-300 */
+}
+
+@layer base {
+  html {
+    @apply antialiased;
+  }
+  body {
+    @apply bg-base font-sans text-strong;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 70% -10%, rgba(16, 185, 129, 0.08), transparent),
+      radial-gradient(ellipse 60% 40% at 10% 110%, rgba(59, 130, 246, 0.06), transparent);
+    background-attachment: fixed;
+  }
+  input[type='number']::-webkit-outer-spin-button,
+  input[type='number']::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl bg-surface/80 ring-1 ring-line/10 backdrop-blur-sm;
+    box-shadow:
+      0 1px 2px rgb(15 23 42 / 0.04),
+      0 6px 16px rgb(15 23 42 / 0.05);
+  }
+  .input {
+    @apply w-full rounded-xl bg-raised/80 px-3.5 py-2.5 text-sm text-strong ring-1 ring-line/10
+           placeholder:text-faint outline-none transition
+           focus:ring-2 focus:ring-brand-500 disabled:opacity-50;
+  }
+  .label {
+    @apply mb-1.5 block text-xs font-medium uppercase tracking-wide text-mute;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold
+           transition active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-brand-500 text-slate-950 hover:bg-brand-400;
+  }
+  .btn-secondary {
+    @apply btn bg-raised text-strong ring-1 ring-line/10 hover:bg-raised2;
+  }
+  .btn-danger {
+    @apply btn bg-red-500/15 text-danger ring-1 ring-red-500/30 hover:bg-red-500/25;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ring-1;
+  }
+}
+
+[data-theme='dark'] .card {
+  box-shadow: none;
+}
+
+/* ---- Impression (rapport mensuel) : palette claire forcée ---- */
+@media print {
+  :root,
+  [data-theme='dark'] {
+    color-scheme: light;
+    --c-bg: 255 255 255;
+    --c-surface: 255 255 255;
+    --c-raised: 245 247 250;
+    --c-raised2: 235 238 243;
+    --c-strong: 15 23 42;
+    --c-mute: 70 80 100;
+    --c-faint: 120 128 140;
+    --c-line: 15 23 42;
+    --c-accent: 4 120 87;
+    --c-danger: 190 18 60;
+    --c-warning: 180 83 9;
+    --c-info: 29 78 216;
+  }
+  body {
+    background: #fff !important;
+    background-image: none !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .card {
+    box-shadow: none !important;
+  }
+}
+
+@page {
+  margin: 14mm;
+}
