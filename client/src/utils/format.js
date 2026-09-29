@@ -47,3 +47,10 @@ export function shiftMonth(month, delta) {
   const d = new Date(y, m - 1 + delta, 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
+
+export const FREQUENCY_LABELS = {
+  daily: 'Tous les jours',
+  weekly: 'Toutes les semaines',
+  monthly: 'Tous les mois',
+  yearly: 'Tous les ans',
+};

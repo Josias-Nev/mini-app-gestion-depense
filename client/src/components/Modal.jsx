@@ -27,10 +27,10 @@ export default function Modal({ open, onClose, title, children, maxWidth = 'max-
         aria-modal="true"
       >
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-100">{title}</h2>
+          <h2 className="text-lg font-semibold text-strong">{title}</h2>
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-800 hover:text-slate-200"
+            className="rounded-lg p-1.5 text-mute transition hover:bg-raised2 hover:text-strong"
             aria-label="Fermer"
           >
             <IconClose size={18} />

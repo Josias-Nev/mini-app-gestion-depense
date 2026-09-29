@@ -82,8 +82,8 @@ export default function Profile() {
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
-        <h1 className="text-2xl font-bold text-slate-100">Profil</h1>
-        <p className="text-sm text-slate-500">
+        <h1 className="text-2xl font-bold text-strong">Profil</h1>
+        <p className="text-sm text-faint">
           Gérez vos informations personnelles et vos préférences.
         </p>
       </div>
@@ -92,19 +92,19 @@ export default function Profile() {
         {/* Informations personnelles */}
         <form onSubmit={saveProfile} className="card space-y-4 p-6" noValidate>
           <div className="flex items-center gap-4">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-500/20 text-lg font-bold text-brand-300">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-500/20 text-lg font-bold text-accent">
               {user?.name?.split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase()}
             </div>
             <div>
-              <p className="font-semibold text-slate-100">{user?.name}</p>
-              <p className="text-xs text-slate-500">
+              <p className="font-semibold text-strong">{user?.name}</p>
+              <p className="text-xs text-faint">
                 Membre depuis le {user?.createdAt ? formatDate(user.createdAt.slice(0, 10)) : '—'}
               </p>
             </div>
           </div>
 
           {profileError && (
-            <div className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-300 ring-1 ring-red-500/25">
+            <div className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-danger ring-1 ring-red-500/25">
               {profileError}
             </div>
           )}
@@ -142,7 +142,7 @@ export default function Profile() {
                 </option>
               ))}
             </select>
-            <p className="mt-1.5 text-xs text-slate-500">
+            <p className="mt-1.5 text-xs text-faint">
               Utilisée pour l'affichage de tous les montants de l'application.
             </p>
           </div>
@@ -155,10 +155,10 @@ export default function Profile() {
 
         {/* Mot de passe */}
         <form onSubmit={savePassword} className="card space-y-4 p-6" noValidate>
-          <h2 className="font-semibold text-slate-200">Changer le mot de passe</h2>
+          <h2 className="font-semibold text-strong">Changer le mot de passe</h2>
 
           {pwdError && (
-            <div className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-300 ring-1 ring-red-500/25">
+            <div className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-danger ring-1 ring-red-500/25">
               {pwdError}
             </div>
           )}

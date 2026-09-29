@@ -56,7 +56,7 @@ function BudgetForm({ open, onClose, onSaved, categories, month, initial }) {
     >
       <form onSubmit={onSubmit} className="space-y-4" noValidate>
         {error && (
-          <div className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-300 ring-1 ring-red-500/25">
+          <div className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-danger ring-1 ring-red-500/25">
             {error}
           </div>
         )}
@@ -121,21 +121,21 @@ function BudgetCard({ budget, currency, onEdit, onDelete }) {
           {budget.categoryIcon}
         </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-slate-200">{budget.categoryName}</p>
-          <p className="text-xs text-slate-500">
+          <p className="truncate text-sm font-semibold text-strong">{budget.categoryName}</p>
+          <p className="text-xs text-faint">
             {formatMoney(budget.spent, currency)} dépensés sur {formatMoney(budget.amount, currency)}
           </p>
         </div>
         <div className="flex gap-1 opacity-0 transition group-hover:opacity-100">
           <button
-            className="rounded-lg p-2 text-slate-500 hover:bg-slate-800 hover:text-slate-200"
+            className="rounded-lg p-2 text-faint hover:bg-raised2 hover:text-strong"
             onClick={() => onEdit(budget)}
             title="Modifier"
           >
             <IconEdit />
           </button>
           <button
-            className="rounded-lg p-2 text-slate-500 hover:bg-red-500/10 hover:text-red-400"
+            className="rounded-lg p-2 text-faint hover:bg-red-500/10 hover:text-danger"
             onClick={() => onDelete(budget)}
             title="Supprimer"
           >
@@ -143,15 +143,15 @@ function BudgetCard({ budget, currency, onEdit, onDelete }) {
           </button>
         </div>
       </div>
-      <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-slate-800">
+      <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-raised">
         <div
           className={`h-full rounded-full transition-all ${barColor}`}
           style={{ width: `${pct}%` }}
         />
       </div>
       <div className="mt-2 flex items-center justify-between text-xs">
-        <span className="text-slate-500">{pct}% utilisé</span>
-        <span className={state === 'danger' ? 'font-semibold text-red-400' : 'text-slate-400'}>
+        <span className="text-faint">{pct}% utilisé</span>
+        <span className={state === 'danger' ? 'font-semibold text-danger' : 'text-mute'}>
           {remaining >= 0
             ? `${formatMoney(remaining, currency)} restants`
             : `Dépassé de ${formatMoney(-remaining, currency)} ⚠️`}
@@ -237,15 +237,15 @@ export default function Budgets() {
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-100">Budgets</h1>
-          <p className="text-sm text-slate-500">Fixez des limites de dépenses par catégorie et suivez-les.</p>
+          <h1 className="text-2xl font-bold text-strong">Budgets</h1>
+          <p className="text-sm text-faint">Fixez des limites de dépenses par catégorie et suivez-les.</p>
         </div>
         <div className="flex items-center gap-2">
           <button className="btn-secondary !px-3" onClick={() => setMonth((m) => shiftMonth(m, -1))} aria-label="Mois précédent">
             <IconChevronLeft />
           </button>
-          <span className="min-w-40 text-center text-sm font-semibold text-slate-200">
-            {monthLabel(month)} {isCurrent && <span className="text-xs text-brand-400">· en cours</span>}
+          <span className="min-w-40 text-center text-sm font-semibold text-strong">
+            {monthLabel(month)} {isCurrent && <span className="text-xs text-accent">· en cours</span>}
           </span>
           <button className="btn-secondary !px-3" onClick={() => setMonth((m) => shiftMonth(m, 1))} aria-label="Mois suivant">
             <IconChevronRight />
@@ -257,21 +257,21 @@ export default function Budgets() {
       {budgets && budgets.length > 0 && (
         <div className="card flex flex-wrap items-center gap-6 p-5">
           <div>
-            <p className="text-xs text-slate-500">Budget total</p>
-            <p className="text-xl font-bold text-slate-100">{formatMoney(totals.budget, currency)}</p>
+            <p className="text-xs text-faint">Budget total</p>
+            <p className="text-xl font-bold text-strong">{formatMoney(totals.budget, currency)}</p>
           </div>
           <div>
-            <p className="text-xs text-slate-500">Dépensé</p>
-            <p className="text-xl font-bold text-red-400">{formatMoney(totals.spent, currency)}</p>
+            <p className="text-xs text-faint">Dépensé</p>
+            <p className="text-xl font-bold text-danger">{formatMoney(totals.spent, currency)}</p>
           </div>
           <div>
-            <p className="text-xs text-slate-500">Restant</p>
-            <p className={`text-xl font-bold ${totals.budget - totals.spent >= 0 ? 'text-brand-400' : 'text-red-400'}`}>
+            <p className="text-xs text-faint">Restant</p>
+            <p className={`text-xl font-bold ${totals.budget - totals.spent >= 0 ? 'text-accent' : 'text-danger'}`}>
               {formatMoney(Math.abs(totals.budget - totals.spent), currency, { sign: totals.budget - totals.spent < 0 })}
             </p>
           </div>
           <div className="min-w-44 flex-1">
-            <div className="h-2.5 overflow-hidden rounded-full bg-slate-800">
+            <div className="h-2.5 overflow-hidden rounded-full bg-raised">
               <div
                 className={`h-full rounded-full transition-all ${
                   totals.spent / totals.budget >= 1
@@ -283,7 +283,7 @@ export default function Budgets() {
                 style={{ width: `${Math.min(100, totals.budget ? Math.round((totals.spent / totals.budget) * 100) : 0)}%` }}
               />
             </div>
-            <p className="mt-1.5 text-xs text-slate-500">
+            <p className="mt-1.5 text-xs text-faint">
               {totals.budget ? Math.round((totals.spent / totals.budget) * 100) : 0}% du budget global utilisé
             </p>
           </div>

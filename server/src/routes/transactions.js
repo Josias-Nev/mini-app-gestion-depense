@@ -2,6 +2,7 @@ const express = require('express');
 const { z } = require('zod');
 const db = require('../db');
 const { validate } = require('../middleware/validate');
+const { checkCategory } = require('../categoryCheck');
 
 const router = express.Router();
 
@@ -26,62 +27,11 @@ function toCents(amount) {
   return Math.round(amount * 100);
 }
 
-/** Vérifie que la catégorie appartient à l'utilisateur et correspond au type. */
-function checkCategory(req, res, categoryId, type) {
-  const cat = db
-    .prepare('SELECT * FROM categories WHERE id = ? AND user_id = ?')
-    .get(categoryId, req.userId);
-  if (!cat) {
-    res.status(404).json({ error: { message: 'Catégorie introuvable.' } });
-    return false;
-  }
-  if (cat.type !== type) {
-    res.status(400).json({
-      error: {
-        message:
-          type === 'expense'
-            ? 'Cette catégorie est une catégorie de revenu, pas de dépense.'
-            : 'Cette catégorie est une catégorie de dépense, pas de revenu.',
-      },
-    });
-    return false;
-  }
-  return true;
-}
-
-function getOwnTransaction(req, res, userId) {
-  const id = Number(req.params.id);
-  if (!Number.isInteger(id)) {
-    res.status(400).json({ error: { message: 'Identifiant invalide.' } });
-    return null;
-  }
-  const tx = db
-    .prepare('SELECT * FROM transactions WHERE id = ? AND user_id = ?')
-    .get(id, userId);
-  if (!tx) {
-    res.status(404).json({ error: { message: 'Transaction introuvable.' } });
-    return null;
-  }
-  return tx;
-}
-
-const SELECT_TX = `
-  SELECT t.id, t.type, t.amount, t.description, t.date, t.created_at AS createdAt,
-         t.updated_at AS updatedAt, t.category_id AS categoryId,
-         c.name AS categoryName, c.color AS categoryColor, c.icon AS categoryIcon
-  FROM transactions t
-  LEFT JOIN categories c ON c.id = t.category_id
-`;
-
-// GET /api/transactions — recherche, filtres, tri, pagination
-router.get('/', (req, res) => {
-  const {
-    q, type, categoryId, from, to, min, max,
-    page = '1', limit = '10', sort = 'date_desc',
-  } = req.query;
-
+/** Construit les clauses WHERE communes à la liste et à l'export CSV. */
+function buildFilters(query, userId) {
+  const { q, type, categoryId, from, to, min, max } = query;
   const where = ['t.user_id = ?'];
-  const params = [req.userId];
+  const params = [userId];
 
   if (type === 'income' || type === 'expense') {
     where.push('t.type = ?');
@@ -112,6 +62,37 @@ router.get('/', (req, res) => {
     const like = `%${String(q).trim()}%`;
     params.push(like, like);
   }
+  return { whereSQL: `WHERE ${where.join(' AND ')}`, params };
+}
+
+function getOwnTransaction(req, res, userId) {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) {
+    res.status(400).json({ error: { message: 'Identifiant invalide.' } });
+    return null;
+  }
+  const tx = db
+    .prepare('SELECT * FROM transactions WHERE id = ? AND user_id = ?')
+    .get(id, userId);
+  if (!tx) {
+    res.status(404).json({ error: { message: 'Transaction introuvable.' } });
+    return null;
+  }
+  return tx;
+}
+
+const SELECT_TX = `
+  SELECT t.id, t.type, t.amount, t.description, t.date, t.created_at AS createdAt,
+         t.updated_at AS updatedAt, t.category_id AS categoryId,
+         c.name AS categoryName, c.color AS categoryColor, c.icon AS categoryIcon
+  FROM transactions t
+  LEFT JOIN categories c ON c.id = t.category_id
+`;
+
+// GET /api/transactions — recherche, filtres, tri, pagination
+router.get('/', (req, res) => {
+  const { page = '1', limit = '10', sort = 'date_desc' } = req.query;
+  const { whereSQL, params } = buildFilters(req.query, req.userId);
 
   const sorts = {
     date_desc: 't.date DESC, t.id DESC',
@@ -124,8 +105,6 @@ router.get('/', (req, res) => {
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
   const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 10));
   const offset = (pageNum - 1) * limitNum;
-
-  const whereSQL = `WHERE ${where.join(' AND ')}`;
 
   const total = db
     .prepare(`SELECT COUNT(*) AS n FROM transactions t LEFT JOIN categories c ON c.id = t.category_id ${whereSQL}`)
@@ -154,6 +133,36 @@ router.get('/', (req, res) => {
       totalPages: Math.max(1, Math.ceil(total / limitNum)),
     },
   });
+});
+
+// GET /api/transactions/export.csv — export CSV des transactions (mêmes filtres que la liste)
+router.get('/export.csv', (req, res) => {
+  const { whereSQL, params } = buildFilters(req.query, req.userId);
+  const rows = db
+    .prepare(`${SELECT_TX} ${whereSQL} ORDER BY t.date ASC, t.id ASC LIMIT 50000`)
+    .all(...params);
+
+  const esc = (v) => `"${String(v ?? '').replaceAll('"', '""')}"`;
+  const num = (cents) => (cents / 100).toFixed(2).replace('.', ',');
+  const lines = ['Date;Type;Catégorie;Description;Montant'];
+  for (const t of rows) {
+    const signed = t.type === 'income' ? t.amount : -t.amount;
+    lines.push(
+      [
+        t.date,
+        t.type === 'income' ? 'Revenu' : 'Dépense',
+        esc(t.categoryName || ''),
+        esc(t.description || ''),
+        num(signed),
+      ].join(';')
+    );
+  }
+
+  const stamp = new Date().toISOString().slice(0, 10);
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="transactions-${stamp}.csv"`);
+  // BOM UTF-8 pour une ouverture correcte dans Excel
+  res.send(`\uFEFF${lines.join('\r\n')}`);
 });
 
 // GET /api/transactions/:id

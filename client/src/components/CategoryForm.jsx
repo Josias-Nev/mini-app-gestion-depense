@@ -10,7 +10,7 @@ const EMOJIS = [
 const COLORS = [
   '#f59e0b', '#ef4444', '#8b5cf6', '#3b82f6', '#ec4899', '#14b8a6',
   '#f97316', '#6366f1', '#10b981', '#22c55e', '#0ea5e9', '#64748b',
-  '#d946ef', '#84cc16', '#eab308', '#94a3b8',
+  '#d946ef', '#84cc16', '#eab308', 'rgb(var(--c-mute))',
 ];
 
 const EMPTY = { name: '', type: 'expense', color: COLORS[8], icon: '📦' };
@@ -55,7 +55,7 @@ export default function CategoryForm({ open, onClose, onSaved, initial }) {
     <Modal open={open} onClose={onClose} title={isEdit ? 'Modifier la catégorie' : 'Nouvelle catégorie'}>
       <form onSubmit={onSubmit} className="space-y-4" noValidate>
         {error && (
-          <div className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-300 ring-1 ring-red-500/25">
+          <div className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-danger ring-1 ring-red-500/25">
             {error}
           </div>
         )}
@@ -74,7 +74,7 @@ export default function CategoryForm({ open, onClose, onSaved, initial }) {
 
         <div>
           <label className="label">Type</label>
-          <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-800/70 p-1 ring-1 ring-white/10">
+          <div className="grid grid-cols-2 gap-2 rounded-xl bg-raised/70 p-1 ring-1 ring-line/10">
             {[
               { v: 'expense', label: '💸 Dépense' },
               { v: 'income', label: '💰 Revenu' },
@@ -86,9 +86,9 @@ export default function CategoryForm({ open, onClose, onSaved, initial }) {
                 className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${
                   form.type === o.v
                     ? o.v === 'expense'
-                      ? 'bg-red-500/20 text-red-300 ring-1 ring-red-500/30'
-                      : 'bg-brand-500/20 text-brand-300 ring-1 ring-brand-500/30'
-                    : 'text-slate-400 hover:text-slate-200'
+                      ? 'bg-red-500/20 text-danger ring-1 ring-red-500/30'
+                      : 'bg-brand-500/20 text-accent ring-1 ring-brand-500/30'
+                    : 'text-mute hover:text-strong'
                 }`}
               >
                 {o.label}
@@ -99,13 +99,13 @@ export default function CategoryForm({ open, onClose, onSaved, initial }) {
 
         <div>
           <label className="label">Icône</label>
-          <div className="grid max-h-36 grid-cols-8 gap-1.5 overflow-y-auto rounded-xl bg-slate-800/60 p-2 ring-1 ring-white/10 sm:grid-cols-12">
+          <div className="grid max-h-36 grid-cols-8 gap-1.5 overflow-y-auto rounded-xl bg-raised/60 p-2 ring-1 ring-line/10 sm:grid-cols-12">
             {EMOJIS.map((e) => (
               <button
                 key={e}
                 type="button"
                 onClick={() => setForm((f) => ({ ...f, icon: e }))}
-                className={`rounded-lg p-1.5 text-lg transition hover:bg-slate-700 ${
+                className={`rounded-lg p-1.5 text-lg transition hover:bg-raised2 ${
                   form.icon === e ? 'bg-brand-500/25 ring-1 ring-brand-500/40' : ''
                 }`}
               >
@@ -124,7 +124,7 @@ export default function CategoryForm({ open, onClose, onSaved, initial }) {
                 type="button"
                 onClick={() => setForm((f) => ({ ...f, color: c }))}
                 className={`h-8 w-8 rounded-full transition ${
-                  form.color === c ? 'ring-2 ring-white ring-offset-2 ring-offset-slate-900' : 'hover:scale-110'
+                  form.color === c ? 'ring-2 ring-line ring-offset-2 ring-offset-surface' : 'hover:scale-110'
                 }`}
                 style={{ backgroundColor: c }}
                 aria-label={`Couleur ${c}`}
@@ -134,15 +134,15 @@ export default function CategoryForm({ open, onClose, onSaved, initial }) {
         </div>
 
         {/* Aperçu */}
-        <div className="flex items-center gap-3 rounded-xl bg-slate-800/60 p-3 ring-1 ring-white/10">
-          <span className="text-xs text-slate-500">Aperçu :</span>
+        <div className="flex items-center gap-3 rounded-xl bg-raised/60 p-3 ring-1 ring-line/10">
+          <span className="text-xs text-faint">Aperçu :</span>
           <span
             className="flex h-9 w-9 items-center justify-center rounded-xl text-lg"
             style={{ backgroundColor: `${form.color}22`, color: form.color }}
           >
             {form.icon}
           </span>
-          <span className="text-sm font-medium text-slate-200">{form.name || 'Ma catégorie'}</span>
+          <span className="text-sm font-medium text-strong">{form.name || 'Ma catégorie'}</span>
         </div>
 
         <div className="flex justify-end gap-2 pt-2">

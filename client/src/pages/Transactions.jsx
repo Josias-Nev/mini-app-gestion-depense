@@ -7,7 +7,7 @@ import { Spinner, EmptyState, ErrorBox } from '../components/Feedback';
 import TransactionForm from '../components/TransactionForm';
 import ConfirmDialog from '../components/ConfirmDialog';
 import Pagination from '../components/Pagination';
-import { IconPlus, IconSearch, IconEdit, IconTrash } from '../components/Icons';
+import { IconPlus, IconSearch, IconEdit, IconTrash, IconDownload } from '../components/Icons';
 import { formatMoney, formatDate } from '../utils/format';
 
 const DEFAULT_FILTERS = {
@@ -101,23 +101,39 @@ export default function Transactions() {
     return categories.filter((c) => c.type === filters.type);
   }, [categories, filters.type]);
 
+  // URL d'export CSV : mêmes filtres que la liste affichée
+  const exportUrl = useMemo(
+    () => `/api/transactions/export.csv${buildQuery(filters)}`,
+    [filters]
+  );
+
   return (
     <div className="space-y-5 animate-fade-in">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-100">Transactions</h1>
-          <p className="text-sm text-slate-500">Recherchez, filtrez et gérez toutes vos opérations.</p>
+          <h1 className="text-2xl font-bold text-strong">Transactions</h1>
+          <p className="text-sm text-faint">Recherchez, filtrez et gérez toutes vos opérations.</p>
         </div>
-        <button className="btn-primary" onClick={openCreate}>
-          <IconPlus size={16} /> Nouvelle transaction
-        </button>
+        <div className="flex gap-2">
+          <a
+            className="btn-secondary"
+            href={exportUrl}
+            download
+            title="Exporter les transactions filtrées au format CSV"
+          >
+            <IconDownload /> Exporter CSV
+          </a>
+          <button className="btn-primary" onClick={openCreate}>
+            <IconPlus size={16} /> Nouvelle transaction
+          </button>
+        </div>
       </div>
 
       {/* Filtres */}
       <div className="card space-y-3 p-4">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div className="relative sm:col-span-2">
-            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-faint">
               <IconSearch size={16} />
             </span>
             <input
@@ -144,11 +160,11 @@ export default function Transactions() {
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <div>
             <label className="label">Du</label>
-            <input type="date" className="input [color-scheme:dark]" value={filters.from} onChange={(e) => set({ from: e.target.value })} />
+            <input type="date" className="input" value={filters.from} onChange={(e) => set({ from: e.target.value })} />
           </div>
           <div>
             <label className="label">Au</label>
-            <input type="date" className="input [color-scheme:dark]" value={filters.to} onChange={(e) => set({ to: e.target.value })} />
+            <input type="date" className="input" value={filters.to} onChange={(e) => set({ to: e.target.value })} />
           </div>
           <div>
             <label className="label">Montant min</label>
@@ -169,12 +185,12 @@ export default function Transactions() {
           </div>
         </div>
         {activeFilters > 0 && (
-          <div className="flex items-center justify-between border-t border-white/5 pt-3">
-            <p className="text-xs text-slate-500">
+          <div className="flex items-center justify-between border-t border-line/5 pt-3">
+            <p className="text-xs text-faint">
               {activeFilters} filtre{activeFilters > 1 ? 's' : ''} actif{activeFilters > 1 ? 's' : ''}
             </p>
             <button
-              className="text-xs font-medium text-brand-400 hover:text-brand-300"
+              className="text-xs font-medium text-accent hover:text-accent"
               onClick={() => { setFilters(DEFAULT_FILTERS); setSearch(''); }}
             >
               Réinitialiser les filtres
@@ -186,13 +202,13 @@ export default function Transactions() {
       {/* Totaux filtrés */}
       {data && !loading && data.pagination.total > 0 && (
         <div className="flex flex-wrap gap-3 text-sm">
-          <span className="chip bg-brand-500/10 text-brand-300 ring-brand-500/25">
+          <span className="chip bg-brand-500/10 text-accent ring-brand-500/25">
             Revenus : {formatMoney(data.totals.income, currency)}
           </span>
-          <span className="chip bg-red-500/10 text-red-300 ring-red-500/25">
+          <span className="chip bg-red-500/10 text-danger ring-red-500/25">
             Dépenses : {formatMoney(data.totals.expense, currency)}
           </span>
-          <span className="chip bg-slate-800 text-slate-300 ring-white/10">
+          <span className="chip bg-raised text-strong ring-line/10">
             Solde de la sélection : {formatMoney(data.totals.income - data.totals.expense, currency, { sign: true })}
           </span>
         </div>
@@ -217,9 +233,9 @@ export default function Transactions() {
           />
         ) : (
           <>
-            <ul className="divide-y divide-white/5">
+            <ul className="divide-y divide-line/5">
               {data.transactions.map((t) => (
-                <li key={t.id} className="group flex items-center gap-3 px-4 py-3.5 transition hover:bg-white/[.02] sm:px-5">
+                <li key={t.id} className="group flex items-center gap-3 px-4 py-3.5 transition hover:bg-line/5 sm:px-5">
                   <span
                     className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg"
                     style={{ backgroundColor: `${t.categoryColor}22`, color: t.categoryColor }}
@@ -227,29 +243,29 @@ export default function Transactions() {
                     {t.categoryIcon || '📦'}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-slate-200">
+                    <p className="truncate text-sm font-medium text-strong">
                       {t.description || t.categoryName || 'Sans description'}
                     </p>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-faint">
                       {t.categoryName || 'Sans catégorie'} · {formatDate(t.date)}
                     </p>
                   </div>
                   <span
-                    className={`text-sm font-semibold ${t.type === 'income' ? 'text-brand-400' : 'text-red-400'}`}
+                    className={`text-sm font-semibold ${t.type === 'income' ? 'text-accent' : 'text-danger'}`}
                   >
                     {t.type === 'income' ? '+' : '−'}
                     {formatMoney(t.amount, currency)}
                   </span>
                   <div className="flex gap-1 opacity-0 transition group-hover:opacity-100">
                     <button
-                      className="rounded-lg p-2 text-slate-500 hover:bg-slate-800 hover:text-slate-200"
+                      className="rounded-lg p-2 text-faint hover:bg-raised2 hover:text-strong"
                       onClick={() => openEdit(t)}
                       title="Modifier"
                     >
                       <IconEdit />
                     </button>
                     <button
-                      className="rounded-lg p-2 text-slate-500 hover:bg-red-500/10 hover:text-red-400"
+                      className="rounded-lg p-2 text-faint hover:bg-red-500/10 hover:text-danger"
                       onClick={() => setDeleting(t)}
                       title="Supprimer"
                     >

@@ -45,7 +45,7 @@ export default function Register() {
       footer={
         <>
           Déjà inscrit ?{' '}
-          <Link to="/login" className="font-semibold text-brand-400 hover:text-brand-300">
+          <Link to="/login" className="font-semibold text-accent hover:text-accent">
             Se connecter
           </Link>
         </>
@@ -53,7 +53,7 @@ export default function Register() {
     >
       <form onSubmit={onSubmit} className="space-y-4" noValidate>
         {error && (
-          <div className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-300 ring-1 ring-red-500/25">
+          <div className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-danger ring-1 ring-red-500/25">
             {error}
           </div>
         )}

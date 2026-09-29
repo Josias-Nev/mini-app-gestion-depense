@@ -18,6 +18,7 @@ function client() {
   let token = null;
   return {
     setToken(t) { token = t; },
+    token() { return token; },
     async req(method, url, body) {
       const res = await fetch(baseUrl + url, {
         method,
@@ -263,6 +264,111 @@ test('statistiques : overview, by-category, monthly, daily', async () => {
   assert.equal(r.status, 200);
   assert.equal(r.data.days.length, 1);
   assert.equal(r.data.days[0].total, 1290);
+});
+
+// ---------------------------- EXPORT CSV ---------------------------
+
+test('export CSV : en-têtes, contenu et filtres', async () => {
+  let res = await fetch(`${baseUrl}/api/transactions/export.csv`, {
+    headers: { Authorization: `Bearer ${alice.token()}` },
+  });
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get('content-type'), /text\/csv/);
+  assert.match(res.headers.get('content-disposition'), /attachment/);
+  // Le BOM UTF-8 est présent dans les octets bruts (le décodage text() de fetch le masque)
+  const raw = Buffer.from(await res.arrayBuffer());
+  assert.deepEqual([...raw.subarray(0, 3)], [0xef, 0xbb, 0xbf], 'BOM UTF-8 présent');
+  const lines = raw.toString('utf8').slice(1).trim().split('\r\n');
+  assert.equal(lines[0], 'Date;Type;Catégorie;Description;Montant');
+  // 3 transactions à ce stade : salaire, sandwich, marché
+  assert.equal(lines.length, 4);
+  assert.ok(lines.some((l) => l.includes('Salaire septembre') && l.includes('2500,00')));
+  assert.ok(lines.some((l) => l.includes('-12,90')), 'dépense signée négativement');
+
+  // filtre appliqué à l'export
+  res = await fetch(`${baseUrl}/api/transactions/export.csv?type=income`, {
+    headers: { Authorization: `Bearer ${alice.token()}` },
+  });
+  const filtered = (await res.text()).trim().split('\r\n');
+  assert.equal(filtered.length, 2); // header + 1 revenu
+});
+
+// -------------------- STATS PAR SOUS-PÉRIODE -----------------------
+
+test('stats/by-period : jour, semaine, mois + validations', async () => {
+  // vue jour : plage de 11 jours, seul le 15/08 a une dépense (12,90 €)
+  let r = await alice.get('/api/stats/by-period?from=2026-08-10&to=2026-08-20&granularity=day');
+  assert.equal(r.status, 200);
+  assert.equal(r.data.points.length, 11);
+  const day15 = r.data.points.find((p) => p.period === '2026-08-15');
+  assert.equal(day15.expense, 1290);
+  assert.equal(r.data.points.filter((p) => p.expense > 0).length, 1);
+
+  // vue semaine : le lundi de la semaine du 15/08 est le 10/08
+  r = await alice.get('/api/stats/by-period?from=2026-08-10&to=2026-08-20&granularity=week');
+  assert.equal(r.status, 200);
+  assert.equal(r.data.points.length, 2);
+  assert.equal(r.data.points[0].period, '2026-08-10');
+  assert.equal(r.data.points[0].expense, 1290);
+
+  // vue mois : 12 sous-périodes, août et septembre alimentés
+  r = await alice.get('/api/stats/by-period?from=2026-01-01&to=2026-12-31&granularity=month');
+  assert.equal(r.status, 200);
+  assert.equal(r.data.points.length, 12);
+  assert.equal(r.data.points.find((p) => p.period === '2026-09-01').income, 250000);
+
+  // validations
+  r = await alice.get('/api/stats/by-period?from=2026-09-01&to=2026-01-01&granularity=month');
+  assert.equal(r.status, 400); // from > to
+  r = await alice.get('/api/stats/by-period?from=2026-01-01&to=2026-04-30&granularity=day');
+  assert.equal(r.status, 400); // trop de jours pour la vue jour
+  r = await alice.get('/api/stats/by-period?from=2024-01-01&to=2026-12-31&granularity=month');
+  assert.equal(r.status, 400); // plage > 366 jours
+  r = await alice.get('/api/stats/by-period?from=2026-01-01&to=2026-02-01&granularity=hour');
+  assert.equal(r.status, 400); // granularité inconnue
+});
+
+// ----------------------- TRANSACTIONS RÉCURRENTES ------------------
+
+test('transactions récurrentes : création, génération, pause, suppression', async () => {
+  const cats = (await alice.get('/api/categories')).data.categories;
+  const subsCatId = cats.find((c) => c.name === 'Abonnements').id;
+
+  // Règle mensuelle depuis juin → échéances de juin à septembre générées d'un coup
+  let r = await alice.post('/api/recurring', {
+    type: 'expense', amount: 9.99, categoryId: subsCatId,
+    frequency: 'monthly', start_date: '2026-06-01', description: 'Netflix',
+  });
+  assert.equal(r.status, 201);
+  const ruleId = r.data.rule.id;
+  assert.equal(r.data.rule.nextRunDate > '2026-09-01', true, 'échéance avancée au mois suivant');
+
+  // les 4 occurrences (juin, juillet, août, septembre) existent
+  r = await alice.get(`/api/transactions?categoryId=${subsCatId}&limit=20`);
+  assert.equal(r.data.pagination.total, 4);
+  assert.ok(r.data.transactions.every((t) => t.amount === 999));
+
+  // validations
+  r = await alice.post('/api/recurring', {
+    type: 'expense', amount: 5, categoryId: subsCatId,
+    frequency: 'whenever', start_date: '2026-09-01',
+  });
+  assert.equal(r.status, 422);
+
+  // pause : la règle passe en inactif
+  r = await alice.patch(`/api/recurring/${ruleId}`, { active: false });
+  assert.equal(r.status, 200);
+  assert.equal(r.data.rule.active, 0);
+
+  // Bob ne peut pas modifier la règle d'Alice
+  r = await bob.patch(`/api/recurring/${ruleId}`, { active: true });
+  assert.equal(r.status, 404);
+
+  // suppression (les transactions générées sont conservées)
+  r = await alice.del(`/api/recurring/${ruleId}`);
+  assert.equal(r.status, 200);
+  r = await alice.get(`/api/transactions?categoryId=${subsCatId}&limit=1`);
+  assert.equal(r.data.pagination.total, 4, 'transactions conservées après suppression de la règle');
 });
 
 // ---------------------------- PROFIL ------------------------------

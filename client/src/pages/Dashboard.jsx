@@ -24,21 +24,21 @@ import { formatMoney, formatDate, shortMonthLabel, monthLabel } from '../utils/f
 
 function StatCard({ title, value, subtitle, icon, tone }) {
   const tones = {
-    neutral: 'bg-slate-800 text-slate-300',
-    up: 'bg-brand-500/15 text-brand-300',
-    down: 'bg-red-500/15 text-red-300',
-    budget: 'bg-blue-500/15 text-blue-300',
+    neutral: 'bg-raised text-strong',
+    up: 'bg-brand-500/15 text-accent',
+    down: 'bg-red-500/15 text-danger',
+    budget: 'bg-blue-500/15 text-info',
   };
   return (
     <div className="card p-5">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-400">{title}</p>
+        <p className="text-sm text-mute">{title}</p>
         <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${tones[tone]}`}>
           {icon}
         </span>
       </div>
-      <p className="mt-2 text-2xl font-bold tracking-tight text-slate-100">{value}</p>
-      {subtitle && <p className="mt-1 text-xs text-slate-500">{subtitle}</p>}
+      <p className="mt-2 text-2xl font-bold tracking-tight text-strong">{value}</p>
+      {subtitle && <p className="mt-1 text-xs text-faint">{subtitle}</p>}
     </div>
   );
 }
@@ -46,8 +46,8 @@ function StatCard({ title, value, subtitle, icon, tone }) {
 function ChartTooltip({ active, payload, label, currency }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="card !bg-slate-900 px-3 py-2 text-xs shadow-xl">
-      {label && <p className="mb-1 font-semibold text-slate-300">{label}</p>}
+    <div className="card !bg-surface px-3 py-2 text-xs shadow-xl">
+      {label && <p className="mb-1 font-semibold text-strong">{label}</p>}
       {payload.map((p) => (
         <p key={p.dataKey ?? p.name} style={{ color: p.color || p.payload?.color }}>
           {p.name} : {formatMoney(p.value, currency)}
@@ -138,16 +138,16 @@ export default function Dashboard() {
       {/* En-tête */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-100">
+          <h1 className="text-2xl font-bold text-strong">
             Bonjour, {user?.name?.split(' ')[0]} 👋
           </h1>
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-faint">
             Voici votre situation pour {monthLabel(overview.month)}.
           </p>
         </div>
         <div className="flex gap-2">
           <button className="btn-secondary" onClick={() => openForm('income')}>
-            <IconArrowUp size={16} className="text-brand-400" /> Revenu
+            <IconArrowUp size={16} className="text-accent" /> Revenu
           </button>
           <button className="btn-primary" onClick={() => openForm('expense')}>
             <IconPlus size={16} /> Dépense
@@ -194,20 +194,20 @@ export default function Dashboard() {
       {/* Graphiques */}
       <div className="grid gap-4 lg:grid-cols-5">
         <div className="card p-5 lg:col-span-3">
-          <h2 className="mb-4 font-semibold text-slate-200">Revenus vs dépenses — 6 derniers mois</h2>
+          <h2 className="mb-4 font-semibold text-strong">Revenus vs dépenses — 6 derniers mois</h2>
           {barData.length ? (
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={barData} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 12 }} axisLine={false} tickLine={false} />
+                <XAxis dataKey="name" tick={{ fill: 'rgb(var(--c-mute))', fontSize: 12 }} axisLine={false} tickLine={false} />
                 <YAxis
-                  tick={{ fill: '#94a3b8', fontSize: 11 }}
+                  tick={{ fill: 'rgb(var(--c-mute))', fontSize: 11 }}
                   axisLine={false}
                   tickLine={false}
                   tickFormatter={(v) => `${v / 100}`}
                   width={60}
                 />
-                <Tooltip content={<ChartTooltip currency={currency} />} cursor={{ fill: 'rgba(148,163,184,.06)' }} />
+                <Tooltip content={<ChartTooltip currency={currency} />} cursor={{ fill: 'rgba(var(--c-mute),.06)' }} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
                 <Bar dataKey="Revenus" fill="#10b981" radius={[6, 6, 0, 0]} maxBarSize={34} />
                 <Bar dataKey="Dépenses" fill="#f43f5e" radius={[6, 6, 0, 0]} maxBarSize={34} />
@@ -219,7 +219,7 @@ export default function Dashboard() {
         </div>
 
         <div className="card p-5 lg:col-span-2">
-          <h2 className="mb-4 font-semibold text-slate-200">Dépenses du mois par catégorie</h2>
+          <h2 className="mb-4 font-semibold text-strong">Dépenses du mois par catégorie</h2>
           {pieData.length ? (
             <ResponsiveContainer width="100%" height={260}>
               <PieChart>
@@ -241,7 +241,7 @@ export default function Dashboard() {
                   layout="horizontal"
                   verticalAlign="bottom"
                   wrapperStyle={{ fontSize: 11 }}
-                  formatter={(v) => <span style={{ color: '#94a3b8' }}>{v}</span>}
+                  formatter={(v) => <span style={{ color: 'rgb(var(--c-mute))' }}>{v}</span>}
                 />
               </PieChart>
             </ResponsiveContainer>
@@ -254,8 +254,8 @@ export default function Dashboard() {
       {/* Dernières transactions */}
       <div className="card">
         <div className="flex items-center justify-between p-5 pb-3">
-          <h2 className="font-semibold text-slate-200">Dernières transactions</h2>
-          <Link to="/transactions" className="text-sm font-medium text-brand-400 hover:text-brand-300">
+          <h2 className="font-semibold text-strong">Dernières transactions</h2>
+          <Link to="/transactions" className="text-sm font-medium text-accent hover:text-accent">
             Tout voir →
           </Link>
         </div>
@@ -271,7 +271,7 @@ export default function Dashboard() {
             }
           />
         ) : (
-          <ul className="divide-y divide-white/5">
+          <ul className="divide-y divide-line/5">
             {data.recent.map((t) => (
               <li key={t.id} className="flex items-center gap-3 px-5 py-3">
                 <span
@@ -281,16 +281,16 @@ export default function Dashboard() {
                   {t.categoryIcon || '📦'}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-slate-200">
+                  <p className="truncate text-sm font-medium text-strong">
                     {t.description || t.categoryName || 'Sans description'}
                   </p>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-faint">
                     {t.categoryName || 'Sans catégorie'} · {formatDate(t.date)}
                   </p>
                 </div>
                 <span
                   className={`text-sm font-semibold ${
-                    t.type === 'income' ? 'text-brand-400' : 'text-red-400'
+                    t.type === 'income' ? 'text-accent' : 'text-danger'
                   }`}
                 >
                   {t.type === 'income' ? '+' : '−'}

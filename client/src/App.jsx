@@ -7,6 +7,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Transactions from './pages/Transactions';
+import Recurring from './pages/Recurring';
 import Categories from './pages/Categories';
 import Budgets from './pages/Budgets';
 import Stats from './pages/Stats';
@@ -65,6 +66,7 @@ export default function App() {
             >
               <Route index element={<Dashboard />} />
               <Route path="/transactions" element={<Transactions />} />
+              <Route path="/recurring" element={<Recurring />} />
               <Route path="/categories" element={<Categories />} />
               <Route path="/budgets" element={<Budgets />} />
               <Route path="/stats" element={<Stats />} />

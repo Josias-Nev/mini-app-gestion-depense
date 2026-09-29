@@ -86,13 +86,13 @@ export default function TransactionForm({ open, onClose, onSaved, categories, in
     >
       <form onSubmit={onSubmit} className="space-y-4" noValidate>
         {error && (
-          <div className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-300 ring-1 ring-red-500/25">
+          <div className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-danger ring-1 ring-red-500/25">
             {error}
           </div>
         )}
 
         {/* Type */}
-        <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-800/70 p-1 ring-1 ring-white/10">
+        <div className="grid grid-cols-2 gap-2 rounded-xl bg-raised/70 p-1 ring-1 ring-line/10">
           {[
             { v: 'expense', label: '💸 Dépense' },
             { v: 'income', label: '💰 Revenu' },
@@ -104,9 +104,9 @@ export default function TransactionForm({ open, onClose, onSaved, categories, in
               className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${
                 form.type === o.v
                   ? o.v === 'expense'
-                    ? 'bg-red-500/20 text-red-300 ring-1 ring-red-500/30'
-                    : 'bg-brand-500/20 text-brand-300 ring-1 ring-brand-500/30'
-                  : 'text-slate-400 hover:text-slate-200'
+                    ? 'bg-red-500/20 text-danger ring-1 ring-red-500/30'
+                    : 'bg-brand-500/20 text-accent ring-1 ring-brand-500/30'
+                  : 'text-mute hover:text-strong'
               }`}
             >
               {o.label}
@@ -136,7 +136,7 @@ export default function TransactionForm({ open, onClose, onSaved, categories, in
             <input
               id="tx-date"
               type="date"
-              className="input [color-scheme:dark]"
+              className="input"
               value={form.date}
               onChange={(e) => set({ date: e.target.value })}
             />
@@ -164,7 +164,7 @@ export default function TransactionForm({ open, onClose, onSaved, categories, in
 
         <div>
           <label className="label" htmlFor="tx-desc">
-            Description <span className="normal-case text-slate-600">(optionnel)</span>
+            Description <span className="normal-case text-faint">(optionnel)</span>
           </label>
           <input
             id="tx-desc"

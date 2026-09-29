@@ -57,10 +57,26 @@ CREATE TABLE IF NOT EXISTS budgets (
   UNIQUE (user_id, category_id, month)
 );
 
+CREATE TABLE IF NOT EXISTS recurring_rules (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  category_id   INTEGER REFERENCES categories(id) ON DELETE SET NULL,
+  type          TEXT NOT NULL CHECK (type IN ('income','expense')),
+  amount        INTEGER NOT NULL CHECK (amount > 0), -- en centimes
+  description   TEXT NOT NULL DEFAULT '',
+  frequency     TEXT NOT NULL CHECK (frequency IN ('daily','weekly','monthly','yearly')),
+  start_date    TEXT NOT NULL, -- format YYYY-MM-DD
+  next_run_date TEXT NOT NULL, -- prochaine échéance
+  active        INTEGER NOT NULL DEFAULT 1,
+  created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_transactions_user_date ON transactions(user_id, date DESC);
 CREATE INDEX IF NOT EXISTS idx_transactions_user_cat  ON transactions(user_id, category_id);
 CREATE INDEX IF NOT EXISTS idx_categories_user        ON categories(user_id);
 CREATE INDEX IF NOT EXISTS idx_budgets_user_month     ON budgets(user_id, month);
+CREATE INDEX IF NOT EXISTS idx_recurring_active       ON recurring_rules(active, next_run_date);
 `);
 
 module.exports = db;

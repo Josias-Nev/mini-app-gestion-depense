@@ -3,7 +3,7 @@ import { IconChevronLeft, IconChevronRight } from './Icons';
 export default function Pagination({ page, totalPages, total, onPage }) {
   if (totalPages <= 1) return null;
   return (
-    <div className="flex items-center justify-between gap-3 pt-4 text-sm text-slate-400">
+    <div className="flex items-center justify-between gap-3 pt-4 text-sm text-mute">
       <span>
         {total} résultat{total > 1 ? 's' : ''} · page {page}/{totalPages}
       </span>

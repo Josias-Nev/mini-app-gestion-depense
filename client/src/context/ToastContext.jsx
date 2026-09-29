@@ -37,15 +37,15 @@ export function ToastProvider({ children }) {
             key={t.id}
             className={`pointer-events-auto flex items-start gap-3 rounded-xl px-4 py-3 text-sm shadow-lg shadow-black/40 ring-1 animate-slide-up ${
               t.type === 'success'
-                ? 'bg-brand-500/15 text-brand-200 ring-brand-500/30'
-                : 'bg-red-500/15 text-red-200 ring-red-500/30'
+                ? 'bg-brand-500/15 text-accent ring-brand-500/30'
+                : 'bg-red-500/15 text-danger ring-red-500/30'
             }`}
           >
             <span className="mt-0.5">{t.type === 'success' ? '✅' : '⚠️'}</span>
             <p className="flex-1">{t.message}</p>
             <button
               onClick={() => dismiss(t.id)}
-              className="text-slate-400 hover:text-slate-200"
+              className="text-mute hover:text-strong"
               aria-label="Fermer"
             >
               ✕

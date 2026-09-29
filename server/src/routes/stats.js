@@ -90,6 +90,96 @@ router.get('/monthly', (req, res) => {
   res.json({ months: rows.reverse() });
 });
 
+// ---- utilitaires de dates pour le découpage en sous-périodes ----
+
+function toDate(iso) {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d));
+}
+
+function toISO(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function addDays(date, n) {
+  const d = new Date(date.getTime());
+  d.setUTCDate(d.getUTCDate() + n);
+  return d;
+}
+
+/** Lundi de la semaine contenant la date (semaines ISO, UTC). */
+function mondayOf(date) {
+  const d = new Date(date.getTime());
+  const dow = (d.getUTCDay() + 6) % 7; // 0 = lundi
+  d.setUTCDate(d.getUTCDate() - dow);
+  return d;
+}
+
+/** Génère les bornes de début de chaque sous-période couvrant [from, to]. */
+function bucketStarts(from, to, granularity) {
+  const end = toDate(to);
+  let current = toDate(from);
+  if (granularity === 'week') current = mondayOf(current);
+  if (granularity === 'month') current.setUTCDate(1);
+  const starts = [];
+  while (current <= end) {
+    starts.push(toISO(current));
+    if (granularity === 'day') current = addDays(current, 1);
+    else if (granularity === 'week') current = addDays(current, 7);
+    else current.setUTCMonth(current.getUTCMonth() + 1);
+  }
+  return starts;
+}
+
+function bucketKey(isoDate, granularity) {
+  if (granularity === 'day') return isoDate;
+  if (granularity === 'week') return toISO(mondayOf(toDate(isoDate)));
+  return `${isoDate.slice(0, 7)}-01`;
+}
+
+// GET /api/stats/by-period?from=&to=&granularity=day|week|month
+// Revenus/dépenses découpés en sous-périodes continues sur une plage libre.
+router.get('/by-period', (req, res) => {
+  const { from, to, granularity = 'month' } = req.query;
+  if (!from || !to || !DATE_RE.test(from) || !DATE_RE.test(to)) {
+    return res.status(400).json({
+      error: { message: 'Paramètres "from" et "to" requis (format AAAA-MM-JJ).' },
+    });
+  }
+  if (from > to) {
+    return res.status(400).json({ error: { message: '"from" doit être antérieur à "to".' } });
+  }
+  if (!['day', 'week', 'month'].includes(granularity)) {
+    return res.status(400).json({ error: { message: 'Granularité invalide (day, week ou month).' } });
+  }
+
+  const spanDays = Math.round((toDate(to) - toDate(from)) / 86400000) + 1;
+  if (spanDays > 366) {
+    return res.status(400).json({ error: { message: 'La plage ne peut pas dépasser 366 jours.' } });
+  }
+  if (granularity === 'day' && spanDays > 62) {
+    return res.status(400).json({
+      error: { message: 'Vue "jour" limitée à 62 jours : choisissez la vue semaine.' },
+    });
+  }
+
+  const starts = bucketStarts(from, to, granularity);
+  const buckets = new Map(starts.map((s) => [s, { period: s, income: 0, expense: 0 }]));
+
+  const rows = db
+    .prepare(
+      `SELECT date, type, amount FROM transactions
+       WHERE user_id = ? AND date BETWEEN ? AND ?`
+    )
+    .all(req.userId, from, to);
+  for (const r of rows) {
+    const b = buckets.get(bucketKey(r.date, granularity));
+    if (b) b[r.type === 'income' ? 'income' : 'expense'] += r.amount;
+  }
+
+  res.json({ from, to, granularity, points: [...buckets.values()] });
+});
+
 // GET /api/stats/daily?month=YYYY-MM — dépenses cumulées jour par jour
 router.get('/daily', (req, res) => {
   const month = req.query.month;

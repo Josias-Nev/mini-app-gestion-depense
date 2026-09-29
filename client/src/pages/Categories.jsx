@@ -10,12 +10,12 @@ import { IconPlus, IconEdit, IconTrash } from '../components/Icons';
 function CategorySection({ title, icon, items, onEdit, onDelete }) {
   return (
     <section className="space-y-3">
-      <h2 className="flex items-center gap-2 font-semibold text-slate-200">
+      <h2 className="flex items-center gap-2 font-semibold text-strong">
         <span>{icon}</span> {title}
-        <span className="text-xs font-normal text-slate-500">({items.length})</span>
+        <span className="text-xs font-normal text-faint">({items.length})</span>
       </h2>
       {items.length === 0 ? (
-        <div className="card p-4 text-sm text-slate-500">Aucune catégorie.</div>
+        <div className="card p-4 text-sm text-faint">Aucune catégorie.</div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {items.map((c) => (
@@ -27,21 +27,21 @@ function CategorySection({ title, icon, items, onEdit, onDelete }) {
                 {c.icon}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-slate-200">{c.name}</p>
-                <p className="text-xs text-slate-500">
+                <p className="truncate text-sm font-medium text-strong">{c.name}</p>
+                <p className="text-xs text-faint">
                   {c.transactionCount} transaction{c.transactionCount > 1 ? 's' : ''}
                 </p>
               </div>
               <div className="flex gap-1 opacity-0 transition group-hover:opacity-100">
                 <button
-                  className="rounded-lg p-2 text-slate-500 hover:bg-slate-800 hover:text-slate-200"
+                  className="rounded-lg p-2 text-faint hover:bg-raised2 hover:text-strong"
                   onClick={() => onEdit(c)}
                   title="Modifier"
                 >
                   <IconEdit />
                 </button>
                 <button
-                  className="rounded-lg p-2 text-slate-500 hover:bg-red-500/10 hover:text-red-400"
+                  className="rounded-lg p-2 text-faint hover:bg-red-500/10 hover:text-danger"
                   onClick={() => onDelete(c)}
                   title="Supprimer"
                 >
@@ -100,8 +100,8 @@ export default function Categories() {
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-100">Catégories</h1>
-          <p className="text-sm text-slate-500">
+          <h1 className="text-2xl font-bold text-strong">Catégories</h1>
+          <p className="text-sm text-faint">
             Organisez vos opérations avec des catégories personnalisées.
           </p>
         </div>

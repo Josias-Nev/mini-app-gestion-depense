@@ -26,6 +26,7 @@ function run() {
   if (user) {
     db.prepare('DELETE FROM transactions WHERE user_id = ?').run(user.id);
     db.prepare('DELETE FROM budgets WHERE user_id = ?').run(user.id);
+    db.prepare('DELETE FROM recurring_rules WHERE user_id = ?').run(user.id);
     console.log('ℹ️  Compte démo existant : données réinitialisées.');
   } else {
     const info = db
@@ -97,10 +98,20 @@ function run() {
       upsertBudget.run(user.id, cat(name).id, mk, euros * 100);
       budgetCount += 1;
     }
+
+    // Règles récurrentes : prochaine échéance au 1er du mois prochain
+    const nextMonth = monthKey(-1);
+    const insertRule = db.prepare(
+      `INSERT INTO recurring_rules (user_id, category_id, type, amount, description, frequency, start_date, next_run_date)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    );
+    insertRule.run(user.id, cat('Salaire').id, 'income', 265000, 'Salaire mensuel', 'monthly', `${nextMonth}-01`, `${nextMonth}-01`);
+    insertRule.run(user.id, cat('Abonnements').id, 'expense', 999, 'Netflix', 'monthly', `${nextMonth}-01`, `${nextMonth}-01`);
+    insertRule.run(user.id, cat('Transport').id, 'expense', 4500, 'Pass transport', 'monthly', `${nextMonth}-01`, `${nextMonth}-01`);
   });
 
   seedAll();
-  console.log(`✅ Démo prête : ${txCount} transactions et ${budgetCount} budgets.`);
+  console.log(`✅ Démo prête : ${txCount} transactions, ${budgetCount} budgets et 3 récurrences.`);
   console.log(`   Identifiants : ${EMAIL} / ${PASSWORD}`);
 }
 
